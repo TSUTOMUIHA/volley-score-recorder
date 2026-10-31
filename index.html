@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#101827">
+<title>Volley Score Recorder</title>
+<style>
+:root{color-scheme:dark;--bg:#101827;--panel:#1d293b;--line:#34445b;--accent:#38bdf8;--text:#f8fafc;--muted:#a9b7ca;--red:#f87171}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif;padding:env(safe-area-inset-top) 12px env(safe-area-inset-bottom);}
+header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 2px}h1{font-size:18px;margin:0} .badge{font-size:11px;color:var(--muted)}
+main{max-width:900px;margin:auto}.preview-wrap{position:relative;background:#000;border-radius:14px;overflow:hidden;aspect-ratio:16/9;border:1px solid var(--line)}video{display:none}canvas{display:block;width:100%;height:100%;object-fit:contain;background:#000}.placeholder{position:absolute;inset:0;display:grid;place-items:center;color:#94a3b8;text-align:center;padding:20px;font-size:14px;pointer-events:none}
+.status{display:flex;justify-content:space-between;align-items:center;margin:10px 2px;color:var(--muted);font-size:12px}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#64748b;margin-right:6px}.dot.live{background:#ef4444;box-shadow:0 0 8px #ef4444}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:12px}.teams{display:grid;grid-template-columns:1fr 1fr;gap:10px}.team{min-width:0;text-align:center}.team input{width:100%;background:#111c2c;color:#fff;border:1px solid var(--line);border-radius:8px;padding:9px 6px;text-align:center;font-size:16px;font-weight:700}.score{font-size:clamp(42px,12vw,76px);font-weight:800;line-height:1.1;padding:5px 0;font-variant-numeric:tabular-nums}.plus{width:100%;border:0;border-radius:10px;padding:15px 6px;background:#0ea5e9;color:#00111c;font-size:18px;font-weight:800;touch-action:manipulation}.plus.b{background:#f59e0b;color:#241300}.team small{display:block;color:var(--muted);margin-top:5px}.middle{display:flex;justify-content:center;align-items:center;gap:12px;color:var(--muted);font-weight:700}.setline{display:flex;align-items:center;justify-content:center;gap:12px;font-size:15px;margin:8px 0 12px}.setline button,.controls button,.secondary{border:1px solid var(--line);background:#26364c;color:#fff;border-radius:9px;padding:10px 12px;font-size:14px;touch-action:manipulation}.controls{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.controls button.primary{background:#16a34a;border-color:#16a34a;font-weight:800}.controls button.stop{background:#b91c1c;border-color:#b91c1c;font-weight:800}.controls button:disabled{opacity:.45}.settings{display:grid;grid-template-columns:1fr 1fr;gap:10px}.settings label{font-size:12px;color:var(--muted)}.settings select{width:100%;margin-top:5px;padding:9px;background:#111c2c;color:#fff;border:1px solid var(--line);border-radius:8px}.note{font-size:12px;line-height:1.6;color:var(--muted);margin:10px 2px}.download{display:block;text-align:center;margin-top:10px;color:#7dd3fc;font-size:14px}.hidden{display:none!important}
+@media(min-width:650px){body{padding:16px}.layout{display:grid;grid-template-columns:1.25fr .9fr;gap:14px;align-items:start}.right .panel:first-child{margin-top:0}.preview-wrap{aspect-ratio:16/9}}
+</style>
+</head>
+<body>
+<header><h1>🏐 Volley Score Recorder</h1><span class="badge">試作版 1.0</span></header>
+<main>
+<div class="layout">
+<section>
+<div class="preview-wrap"><video id="video" playsinline muted></video><canvas id="canvas" width="1280" height="720"></canvas><div id="placeholder" class="placeholder">カメラを起動すると、映像にスコアを重ねて表示します。<br>横向き撮影をおすすめします。</div></div>
+<div class="status"><span><i id="dot" class="dot"></i><span id="statusText">カメラ停止中</span></span><span id="recTime">00:00</span></div>
+<div class="panel"><div class="controls">
+<button id="startCamera" class="primary">カメラ起動</button><button id="startRec" class="primary" disabled>● 録画開始</button><button id="stopRec" class="stop" disabled>録画終了</button>
+</div><a id="download" class="download hidden" download>録画を保存する</a></div>
+<div class="panel"><div class="settings">
+<label>セット終了点<select id="target"><option value="25">25点（通常セット）</option><option value="21">21点</option><option value="15">15点（最終セット）</option></select></label>
+<label>最終セット終了点<select id="finalTarget"><option value="15">15点</option><option value="25">25点</option></select></label>
+</div><p class="note">※ 得点表示は録画映像に直接合成されます。カメラ起動・録画にはSafariでカメラとマイク（音声を入れる場合）の許可が必要です。</p></div>
+</section>
+<section class="right">
+<div class="panel">
+<div class="setline"><button id="prevSet">−</button><strong>第 <span id="setNo">1</span> セット</strong><button id="nextSet">＋</button></div>
+<div class="teams">
+<div class="team"><input id="nameA" value="チーム A" maxlength="12" aria-label="チームA名"><div id="scoreA" class="score">0</div><button id="addA" class="plus">＋1 点</button><small>左側チーム</small></div>
+<div class="team"><input id="nameB" value="チーム B" maxlength="12" aria-label="チームB名"><div id="scoreB" class="score">0</div><button id="addB" class="plus b">＋1 点</button><small>右側チーム</small></div>
+</div>
+<div class="middle" style="margin-top:12px"><span id="setsA">0セット</span><span>—</span><span id="setsB">0セット</span></div>
+</div>
+<div class="panel"><div class="controls">
+<button id="undo">↶ 1つ戻す</button><button id="resetSet">このセットをリセット</button><button id="resetAll">試合をリセット</button>
+</div><p class="note">得点の誤入力は「1つ戻す」で訂正できます。セットを切り替えても、各セットの得点は保持されます。</p></div>
+</section>
+</div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const video=$('video'), canvas=$('canvas'), ctx=canvas.getContext('2d');
+let stream=null, recorder=null, chunks=[], raf=0, startedAt=0, timer=null, history=[], scores=[[0,0]], setNo=1, setWins=[0,0], cameraOn=false;
+function current(){return scores[setNo-1]||[0,0]}
+function ensureSet(n){while(scores.length<n)scores.push([0,0]);}
+function renderUI(){ $('scoreA').textContent=current()[0];$('scoreB').textContent=current()[1];$('setNo').textContent=setNo;$('setsA').textContent=setWins[0]+'セット';$('setsB').textContent=setWins[1]+'セット'; }
+function add(side){history.push({setNo,scores:JSON.parse(JSON.stringify(scores)),setWins:[...setWins]});current()[side]++;renderUI();}
+function undo(){if(!history.length)return;const h=history.pop();setNo=h.setNo;scores=h.scores;setWins=h.setWins;renderUI();}
+function targetForSet(){return setNo>=5?Number($('finalTarget').value):Number($('target').value)}
+function draw(){const w=canvas.width,h=canvas.height;ctx.clearRect(0,0,w,h);if(cameraOn&&video.readyState>=2){const vw=video.videoWidth,vh=video.videoHeight;const scale=Math.min(w/vw,h/vh),dw=vw*scale,dh=vh*scale;ctx.drawImage(video,(w-dw)/2,(h-dh)/2,dw,dh);}else{ctx.fillStyle='#07111f';ctx.fillRect(0,0,w,h);ctx.fillStyle='#94a3b8';ctx.textAlign='center';ctx.font='28px sans-serif';ctx.fillText('VOLLEY SCORE RECORDER',w/2,h/2);}
+// scoreboard overlay
+const barH=150, y=h-barH;ctx.fillStyle='rgba(4,12,24,.82)';ctx.fillRect(0,y,w,barH);ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold 30px sans-serif';ctx.fillText('第 '+setNo+' セット',w/2,y+38);
+const a=current()[0],b=current()[1];ctx.textAlign='left';ctx.font='bold 34px sans-serif';ctx.fillStyle='#7dd3fc';ctx.fillText(($('nameA').value||'チームA').slice(0,12),55,y+88);ctx.textAlign='right';ctx.fillStyle='#fbbf24';ctx.fillText(($('nameB').value||'チームB').slice(0,12),w-55,y+88);
+ctx.textAlign='center';ctx.fillStyle='#fff';ctx.font='bold 66px sans-serif';ctx.fillText(a+'  -  '+b,w/2,y+116);
+if(recorder&&recorder.state==='recording'){ctx.fillStyle='#ef4444';ctx.beginPath();ctx.arc(42,42,12,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff';ctx.textAlign='left';ctx.font='bold 24px sans-serif';ctx.fillText('REC',65,50);}
+raf=requestAnimationFrame(draw);}
+async function startCamera(){try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:true});video.srcObject=stream;await video.play();cameraOn=true;$('placeholder').classList.add('hidden');$('startRec').disabled=false;$('statusText').textContent='カメラ準備完了';$('dot').classList.add('live');draw();}catch(e){alert('カメラを起動できませんでした。Safariで開いていること、カメラの使用が許可されていることをご確認ください。\n'+e.message);}}
+function chooseMime(){const types=['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm'];return types.find(t=>window.MediaRecorder&&MediaRecorder.isTypeSupported(t))||'';}
+function startRecording(){if(!cameraOn)return;try{const streamOut=canvas.captureStream(30);const audioTracks=stream.getAudioTracks();audioTracks.forEach(t=>streamOut.addTrack(t));const mime=chooseMime();recorder=new MediaRecorder(streamOut,mime?{mimeType:mime}:undefined);chunks=[];recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};recorder.onstop=()=>{const type=recorder.mimeType||'video/mp4';const blob=new Blob(chunks,{type});const url=URL.createObjectURL(blob);const a=$('download');a.href=url;a.download='volley-match-'+new Date().toISOString().replace(/[:.]/g,'-')+(type.includes('mp4')?'.mp4':'.webm');a.textContent='⬇ 録画を保存する（'+(type.includes('mp4')?'MP4':'WebM')+'）';a.classList.remove('hidden');$('statusText').textContent='録画完了';};recorder.start(1000);startedAt=Date.now();timer=setInterval(()=>{const s=Math.floor((Date.now()-startedAt)/1000);$('recTime').textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')},500);$('startRec').disabled=true;$('stopRec').disabled=false;$('statusText').textContent='録画中';}catch(e){alert('録画を開始できませんでした。お使いのSafariが録画形式に対応していない可能性があります。\n'+e.message);}}
+function stopRecording(){if(recorder&&recorder.state!=='inactive')recorder.stop();clearInterval(timer);$('startRec').disabled=false;$('stopRec').disabled=true;}
+$('startCamera').onclick=startCamera;$('startRec').onclick=startRecording;$('stopRec').onclick=stopRecording;$('addA').onclick=()=>add(0);$('addB').onclick=()=>add(1);$('undo').onclick=undo;
+$('nextSet').onclick=()=>{if(setNo<5){setNo++;ensureSet(setNo);renderUI();}};$('prevSet').onclick=()=>{if(setNo>1){setNo--;renderUI();}};
+$('resetSet').onclick=()=>{if(confirm('現在のセットの得点を0-0に戻しますか？')){history.push({setNo,scores:JSON.parse(JSON.stringify(scores)),setWins:[...setWins]});scores[setNo-1]=[0,0];renderUI();}};
+$('resetAll').onclick=()=>{if(confirm('全セットの得点をリセットしますか？')){history=[];scores=[[0,0]];setNo=1;setWins=[0,0];renderUI();}};
+['nameA','nameB'].forEach(id=>$(id).addEventListener('input',()=>{}));
+renderUI();draw();
+window.addEventListener('beforeunload',()=>{if(stream)stream.getTracks().forEach(t=>t.stop());});
+</script>
+</body>
+</html>
